@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# define the common path
+vid=rear26
+imagepath=../data/input/$vid/
+matchpath=../data/output/$vid/match/
+flowpath=../data/output/$vid/flow/
+edgepath=../data/output/$vid/edge/
+
+# CPM match exe 
+CPM_match=./CPM
+
+#epicFlow exe
+epicflow_exe=./EpicFlow
+
+# sed segmentation
+SED=SED/
+piotr=cvToolbox/
+
+image_s=.png
+match_type=.match
+edge_type=.edge
+flow_type=.flo
+
+# get the edge file
+matlab -nodesktop -nojvm -r "addpath(genpath('$SED'));addpath(genpath('$piotr'));load('modelBsds.mat');files=dir(['$imagepath','*','$image_s']);for i=1:length(files),frame=imread(['$imagepath',files(i).name]);edges=edgesDetect(frame,model);fid=fopen(['$edgepath',files(i).name(1:end-3),'.edge'],'wb');fwrite(fid,transpose(edges),'single');fclose(fid);end;exit"
+
+# CPM match 
+j=0
+X=$(ls -l $imagepath | grep $image_s | awk '{print $9}')
+for item in $X
+do
+	images[$j]=$item
+	j=$(($j+1))
+done
+
+echo "images have written to array....................."
+
+for i in $(seq 0 $(($j-2)))
+do
+	$CPM_match/CPM $imagepath${images[$i]} $imagepath${images[$(($i+1))]} $matchpath${images[$i]%.*}$match_type
+done
+
+# epicFlow
+
+k=0
+X=$(ls -l $edgepath | grep $edge_type | awk '{print $9}')
+for item in $X
+do
+	edges[$k]=$item
+	k=$(($k+1))
+done
+
+echo "edges have written to array....................."
+
+
+t=0
+X=$(ls -l $matchpath | grep $match_type | awk '{print $9}')
+for item in $X
+do
+	matches[$t]=$item
+	t=$(($t+1))
+done
+
+echo "matchfiles have written to array....................."
+
+
+for i in $(seq 0 $(($j-2)))
+do
+	$epicflow_exe/epicflow-static $imagepath${images[$i]} $imagepath${images[$(($i+1))]} $edgepath${edges[$i]} $matchpath${matches[$i]} $flowpath${images[$i]%.*}$flow_type
+done
+
+# change the flo files to images
+#matlab -nodesktop -nojvm -r "addpath('./flow-code-matlab');cd('$flowpath');files=dir('./*.flo');for i=1:length(files),I=readFlowFile(files(i).name);img=flowToColor(I);imwrite(img,[files(i).name(1:end-3),'png']);end;exit"
